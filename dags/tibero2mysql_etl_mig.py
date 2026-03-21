@@ -12,7 +12,7 @@ import logging
 logger = logging.getLogger("airflow.task")
 
 # [Path 설정]
-JSON_PATH = "/data/airflow/script/json/tibero2myslq_info.json"
+JSON_PATH = "/data/airflow/script/json/tibero2mysql_info.json"
 # Tibero JDBC 드라이버 위치 (서버 환경에 맞춰 확인 필요)
 JDBC_DRIVER_PATH = "/data/airflow/lib/thr_jdbc.jar" 
 
