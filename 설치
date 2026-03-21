@@ -1,0 +1,60 @@
+통합 이행 환경 구축 (RHEL 기반)########################################################################################################################
+
+1) Airflow 설치 (Python venv 기반, MetaDB는 PG 활용)
+
+  # Python 및 개발 도구
+  sudo dnf install -y python39 python39-devel gcc
+  python3 -m venv ~/airflow_venv
+  source ~/airflow_venv/bin/activate
+  pip install --upgrade pip
+  
+  # Airflow 설치 (PostgreSQL 프로바이더 포함)
+  export AIRFLOW_HOME=~/airflow
+  AIRFLOW_VERSION=2.7.1
+  PYTHON_VERSION="$(python3 --version | cut -d " " -f 2 | cut -d "." -f 1-2)"
+  CONSTRAINT_URL="https://raw.githubusercontent.com/apache/airflow/constraints-${AIRFLOW_VERSION}/constraints-${PYTHON_VERSION}.txt"
+  pip install "apache-airflow[postgres,mysql,celery]==${AIRFLOW_VERSION}" --constraint "${CONSTRAINT_URL}"
+  
+  # 초기화 및 계정 생성 (한방에 실행)
+  airflow db init
+  airflow users create --username admin --firstname DA --lastname Admin --role Admin --email admin@example.com --password admin
+
+DB 클라이언트 및 이행 도구#########################################################################################################################
+
+1. MySQL 도구 (mysqldump, mydumper)
+MySQL 서버 전체를 깔 필요는 없지만, mysql-community-client가 있어야 mysqldump를 쓸 수 있습니다.
+
+# MySQL 공식 레포지토리 등록 (RHEL 8 기준)
+sudo dnf install -y https://dev.mysql.com/get/mysql80-community-release-el8-1.noarch.rpm
+sudo dnf module disable -y mysql
+
+# Client 설치 (여기 mysqldump가 포함됨)
+sudo dnf install -y mysql-community-client
+
+# mydumper 설치 (병렬 이행용)
+sudo dnf install -y https://github.com/mydumper/mydumper/releases/download/v0.14.3-1/mydumper-0.14.3-1.el8.x86_64.rpm
+2. PostgreSQL 도구 (pg_dump, psql)
+PostgreSQL도 클라이언트 패키지에 이행 도구가 포함되어 있습니다.
+
+# PG 공식 레포지토리 등록
+sudo dnf install -y https://download.postgresql.org/pub/repos/yum/reporpms/EL-$(rpm -E %rhel)-x86_64/pgdg-redhat-repo-latest.noarch.rpm
+sudo dnf -qy module disable postgresql
+
+# Client 및 Lib 설치 (pg_dump, pg_restore 포함)
+sudo dnf install -y postgresql15 postgresql15-server
+3. MongoDB 도구 (mongodump, mongorestore)
+# MongoDB 레포지토리 등록
+cat <<EOF | sudo tee /etc/yum.repos.d/mongodb-org-6.0.repo
+[mongodb-org-6.0]
+name=MongoDB Repository
+baseurl=https://repo.mongodb.org/yum/redhat/8/mongodb-org/6.0/x86_64/
+gpgcheck=1
+enabled=1
+gpgkey=https://www.mongodb.org/static/pgp/server-6.0.asc
+EOF
+
+# Database Tools 설치
+sudo dnf install -y mongodb-database-tools
+
+
+
