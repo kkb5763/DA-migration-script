@@ -1,0 +1,19 @@
+{
+  "db_type": "mysql_etl_enc",
+  "source": { "host": "10.10.1.10", "port": 3306, "user": "root", "pass": "src_pass" },
+  "target": { "host": "10.10.1.20", "port": 3306, "user": "root", "pass": "tgt_pass" },
+  "jobs": [
+    {
+      "schema": "member_db",
+      "table": "mbr_base",
+      "chunk_size": 2000,
+      "enc_columns": ["mbr_detail", "mbr_auth"]
+    },
+    {
+      "schema": "cust_db",
+      "table": "cst_base",
+      "chunk_size": 2000,
+      "enc_columns": ["cst_phone", "cst_email"]
+    }
+  ]
+}

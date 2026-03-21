@@ -1,0 +1,20 @@
+{
+  "db_type_pair": "tibero_to_mysql",
+  "source_tibero": {
+    "host": "10.10.4.10", "port": 8629, "sid": "tibero", "user": "sys", "pass": "tibero_src_pwd"
+  },
+  "target_mysql": {
+    "host": "10.10.1.20", "port": 3306, "user": "root", "pass": "tgt_pass"
+  },
+  "jobs": [
+    {
+      "source_schema": "MEMBER_DB",
+      "target_schema": "member_db",
+      "tables": ["MBR_BASE", "MBR_DETAIL"],
+      "enc_columns": {
+        "MBR_BASE": ["RESIDENT_NO", "MOBILE_NO"],
+        "MBR_DETAIL": ["EMAIL", "ADDR_DETAIL"]
+      }
+    }
+  ]
+}
