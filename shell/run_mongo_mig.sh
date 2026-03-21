@@ -9,61 +9,67 @@ if [ -z "$CONF_FILE" ] || [ ! -f "$CONF_FILE" ]; then
   exit 1
 fi
 
-for cmd in jq mongodump mongorestore; do
+for cmd in python mongodump mongorestore; do
   if ! command -v "$cmd" >/dev/null 2>&1; then
     echo "Required command not found: $cmd"
     exit 1
   fi
 done
 
-SRC_HOST=$(jq -r '.source.host' "$CONF_FILE")
-SRC_PORT=$(jq -r '.source.port // 27017' "$CONF_FILE")
-SRC_USER=$(jq -r '.source.user' "$CONF_FILE")
-SRC_PASS=$(jq -r '.source.pass' "$CONF_FILE")
-SRC_AUTH_DB=$(jq -r '.source.auth_db // "admin"' "$CONF_FILE")
+python - "$CONF_FILE" <<'PY'
+import json
+import os
+import shlex
+import subprocess
+import sys
 
-TGT_HOST=$(jq -r '.target.host' "$CONF_FILE")
-TGT_PORT=$(jq -r '.target.port // 27017' "$CONF_FILE")
-TGT_USER=$(jq -r '.target.user' "$CONF_FILE")
-TGT_PASS=$(jq -r '.target.pass' "$CONF_FILE")
-TGT_AUTH_DB=$(jq -r '.target.auth_db // "admin"' "$CONF_FILE")
+conf_path = sys.argv[1]
+with open(conf_path, "r", encoding="utf-8") as f:
+    cfg = json.load(f)
 
-DUMP_DIR="./dump/mongo"
-mkdir -p "$DUMP_DIR"
+src = cfg["source"]
+tgt = cfg["target"]
+dump_dir = "./dump/mongo"
+os.makedirs(dump_dir, exist_ok=True)
 
-jq -c '.jobs[]' "$CONF_FILE" | while read -r job; do
-  DB=$(echo "$job" | jq -r '.database')
-  OPTIONS=$(echo "$job" | jq -r '.options // ""')
+for job in cfg["jobs"]:
+    db = job["database"]
+    options = shlex.split(job.get("options", ""))
+    for coll in job.get("collections", []):
+        archive_path = os.path.join(dump_dir, f"{db}_{coll}.archive.gz")
+        if os.path.exists(archive_path):
+            os.remove(archive_path)
 
-  for COLL in $(echo "$job" | jq -r '.collections[]'); do
-    ARCHIVE_PATH="${DUMP_DIR}/${DB}_${COLL}.archive.gz"
-    rm -f "$ARCHIVE_PATH"
+        print(f"[MongoDB] Dump: {db}.{coll}")
+        dump_cmd = [
+            "mongodump",
+            "--host", src["host"],
+            "--port", str(src.get("port", 27017)),
+            "--username", src["user"],
+            "--password", src["pass"],
+            "--authenticationDatabase", src.get("auth_db", "admin"),
+            "--db", db,
+            "--collection", coll,
+            "--archive", archive_path,
+            "--gzip",
+        ] + options
+        subprocess.run(dump_cmd, check=True)
 
-    echo "[MongoDB] Dump: ${DB}.${COLL}"
-    mongodump \
-      --host "$SRC_HOST" \
-      --port "$SRC_PORT" \
-      --username "$SRC_USER" \
-      --password "$SRC_PASS" \
-      --authenticationDatabase "$SRC_AUTH_DB" \
-      --db "$DB" \
-      --collection "$COLL" \
-      --archive="$ARCHIVE_PATH" \
-      --gzip \
-      $OPTIONS
+        print(f"[MongoDB] Restore: {db}.{coll}")
+        restore_cmd = [
+            "mongorestore",
+            "--host", tgt["host"],
+            "--port", str(tgt.get("port", 27017)),
+            "--username", tgt["user"],
+            "--password", tgt["pass"],
+            "--authenticationDatabase", tgt.get("auth_db", "admin"),
+            "--nsInclude", f"{db}.{coll}",
+            "--archive", archive_path,
+            "--gzip",
+            "--drop",
+        ]
+        subprocess.run(restore_cmd, check=True)
 
-    echo "[MongoDB] Restore: ${DB}.${COLL}"
-    mongorestore \
-      --host "$TGT_HOST" \
-      --port "$TGT_PORT" \
-      --username "$TGT_USER" \
-      --password "$TGT_PASS" \
-      --authenticationDatabase "$TGT_AUTH_DB" \
-      --nsInclude "${DB}.${COLL}" \
-      --archive="$ARCHIVE_PATH" \
-      --gzip \
-      --drop
-
-    rm -f "$ARCHIVE_PATH"
-  done
-done
+        if os.path.exists(archive_path):
+            os.remove(archive_path)
+PY

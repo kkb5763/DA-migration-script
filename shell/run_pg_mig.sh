@@ -1,26 +1,52 @@
 #!/bin/bash
-# Usage: ./run_pg_mig.sh json/pg_migration.json
+# Usage: ./run_pg_mig.sh json/pg2pgSql_info.json
 
-CONF_FILE=$1
-if [ ! -f "$CONF_FILE" ]; then echo "❌ Config file not found!"; exit 1; fi
+set -euo pipefail
 
-export PGPASSWORD=$(jq -r '.source.pass' $CONF_FILE)
-TGT_PASS=$(jq -r '.target.pass' $CONF_FILE)
-SRC_HOST=$(jq -r '.source.host' $CONF_FILE)
-TGT_HOST=$(jq -r '.target.host' $CONF_FILE)
-SRC_DB=$(jq -r '.source.database' $CONF_FILE)
-TGT_DB=$(jq -r '.target.database' $CONF_FILE)
+CONF_FILE="${1:-}"
+if [ -z "$CONF_FILE" ] || [ ! -f "$CONF_FILE" ]; then
+  echo "Config file not found: $CONF_FILE"
+  exit 1
+fi
 
-jq -c '.jobs[]' $CONF_FILE | while read job; do
-    SCHEMA=$(echo $job | jq -r '.schema')
-    echo "▶️ [PostgreSQL] Processing Schema: $SCHEMA"
+python - "$CONF_FILE" <<'PY'
+import json
+import os
+import subprocess
+import sys
 
-    for tbl in $(echo $job | jq -r '.tables[]'); do
-        echo "  - Table: $SCHEMA.$tbl"
-        # --clean 옵션으로 기존 테이블 삭제 후 생성(Idempotency 확보)
-        pg_dump -h $SRC_HOST -U $(jq -r '.source.user' $CONF_FILE) -d $SRC_DB \
-                -t "$SCHEMA.$tbl" --clean | \
-        PGPASSWORD=$TGT_PASS psql -h $TGT_HOST -U $(jq -r '.target.user' $CONF_FILE) -d $TGT_DB
-    done
-done
-unset PGPASSWORD
+conf_path = sys.argv[1]
+with open(conf_path, "r", encoding="utf-8") as f:
+    cfg = json.load(f)
+
+source = cfg["source"]
+target = cfg["target"]
+
+for job in cfg["jobs"]:
+    schema = job["schema"]
+    print(f"[PostgreSQL] Processing Schema: {schema}")
+    for table in job.get("tables", []):
+        print(f"  - Table: {schema}.{table}")
+        src_env = os.environ.copy()
+        src_env["PGPASSWORD"] = source["pass"]
+        tgt_env = os.environ.copy()
+        tgt_env["PGPASSWORD"] = target["pass"]
+
+        dump_cmd = [
+            "pg_dump", "-h", source["host"], "-p", str(source.get("port", 5432)),
+            "-U", source["user"], "-d", source["database"], "-t", f"{schema}.{table}",
+            "--clean", "--if-exists"
+        ]
+        restore_cmd = [
+            "psql", "-h", target["host"], "-p", str(target.get("port", 5432)),
+            "-U", target["user"], "-d", target["database"]
+        ]
+
+        p1 = subprocess.Popen(dump_cmd, env=src_env, stdout=subprocess.PIPE)
+        p2 = subprocess.Popen(restore_cmd, env=tgt_env, stdin=p1.stdout)
+        p1.stdout.close()
+        rc2 = p2.wait()
+        rc1 = p1.wait()
+        if rc1 != 0 or rc2 != 0:
+            raise RuntimeError(f"pg_dump/psql failed: {schema}.{table}")
+PY

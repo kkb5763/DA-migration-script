@@ -1,34 +1,74 @@
 #!/bin/bash
-# Usage: ./run_mysql_mig.sh json/mysql_migration.json
+# Usage: ./run_mysql_mig.sh json/mysql2mysql_info.json
 
-CONF_FILE=$1
-if [ ! -f "$CONF_FILE" ]; then echo "❌ Config file not found!"; exit 1; fi
+set -euo pipefail
 
-SRC_HOST=$(jq -r '.source.host' $CONF_FILE)
-SRC_USER=$(jq -r '.source.user' $CONF_FILE)
-export MYSQL_PWD=$(jq -r '.source.pass' $CONF_FILE)
+CONF_FILE="${1:-}"
+if [ -z "$CONF_FILE" ] || [ ! -f "$CONF_FILE" ]; then
+  echo "Config file not found: $CONF_FILE"
+  exit 1
+fi
 
-TGT_HOST=$(jq -r '.target.host' $CONF_FILE)
-TGT_USER=$(jq -r '.target.user' $CONF_FILE)
-TGT_PASS=$(jq -r '.target.pass' $CONF_FILE)
+python - "$CONF_FILE" <<'PY'
+import json
+import os
+import subprocess
+import sys
 
-jq -c '.jobs[]' $CONF_FILE | while read job; do
-    SCHEMA=$(echo $job | jq -r '.schema')
-    METHOD=$(echo $job | jq -r '.method')
-    TABLES=$(echo $job | jq -r '.tables | join(",")')
+conf_path = sys.argv[1]
+with open(conf_path, "r", encoding="utf-8") as f:
+    cfg = json.load(f)
 
-    echo "▶️ [MySQL] Processing Schema: $SCHEMA ($METHOD)"
-    mkdir -p "./dump/$SCHEMA"
+source = cfg["source"]
+target = cfg["target"]
 
-    if [ "$METHOD" == "mydumper" ]; then
-        mydumper -h $SRC_HOST -u $SRC_USER -B $SCHEMA -T $TABLES -o "./dump/$SCHEMA" --rows 100000
-        MYSQL_PWD=$TGT_PASS myloader -h $TGT_HOST -u $TGT_USER -B $SCHEMA -d "./dump/$SCHEMA" -o
-    else
-        for tbl in $(echo $job | jq -r '.tables[]'); do
-            echo "  - Table: $tbl"
-            mysqldump -h $SRC_HOST -u $SRC_USER $SCHEMA $tbl | \
-            MYSQL_PWD=$TGT_PASS mysql -h $TGT_HOST -u $TGT_USER $SCHEMA
-        done
-    fi
-done
-unset MYSQL_PWD
+for job in cfg["jobs"]:
+    schema = job["schema"]
+    method = job.get("method", "mydumper")
+    tables = job.get("tables", [])
+    dump_dir = os.path.join(".", "dump", schema)
+    os.makedirs(dump_dir, exist_ok=True)
+
+    print(f"[MySQL] Processing Schema: {schema} ({method})")
+    if method == "mydumper":
+        src_env = os.environ.copy()
+        src_env["MYSQL_PWD"] = source["pass"]
+        dump_cmd = [
+            "mydumper", "-h", source["host"], "-P", str(source.get("port", 3306)),
+            "-u", source["user"], "-B", schema, "-T", ",".join(tables),
+            "-o", dump_dir, "--rows", "100000"
+        ]
+        subprocess.run(dump_cmd, env=src_env, check=True)
+
+        tgt_env = os.environ.copy()
+        tgt_env["MYSQL_PWD"] = target["pass"]
+        load_cmd = [
+            "myloader", "-h", target["host"], "-P", str(target.get("port", 3306)),
+            "-u", target["user"], "-B", schema, "-d", dump_dir, "-o"
+        ]
+        subprocess.run(load_cmd, env=tgt_env, check=True)
+    else:
+        for table in tables:
+            print(f"  - Table: {table}")
+            src_env = os.environ.copy()
+            src_env["MYSQL_PWD"] = source["pass"]
+            tgt_env = os.environ.copy()
+            tgt_env["MYSQL_PWD"] = target["pass"]
+
+            dump_cmd = [
+                "mysqldump", "-h", source["host"], "-P", str(source.get("port", 3306)),
+                "-u", source["user"], schema, table
+            ]
+            load_cmd = [
+                "mysql", "-h", target["host"], "-P", str(target.get("port", 3306)),
+                "-u", target["user"], schema
+            ]
+
+            p1 = subprocess.Popen(dump_cmd, env=src_env, stdout=subprocess.PIPE)
+            p2 = subprocess.Popen(load_cmd, env=tgt_env, stdin=p1.stdout)
+            p1.stdout.close()
+            rc2 = p2.wait()
+            rc1 = p1.wait()
+            if rc1 != 0 or rc2 != 0:
+                raise RuntimeError(f"mysqldump/mysql failed: {schema}.{table}")
+PY
