@@ -1,0 +1,43 @@
+{
+  "db_type": "mysql",
+  "source": {
+    "host": "10.10.1.10",
+    "port": 3306,
+    "user": "root",
+    "pass": "src_mysql_pass123!"
+  },
+  "target": {
+    "host": "10.10.1.20",
+    "port": 3306,
+    "user": "root",
+    "pass": "tgt_mysql_pass456@"
+  },
+  "jobs": [
+    {
+      "schema": "member_db",
+      "method": "mydumper",
+      "tables": [
+        "mbr_base", "mbr_detail", "mbr_log_01", "mbr_log_02", "mbr_log_03", 
+        "mbr_auth", "mbr_sns", "mbr_point", "mbr_grade", "mbr_dormant"
+      ],
+      "threads": 4
+    },
+    {
+      "schema": "item_db",
+      "method": "mysqldump",
+      "tables": [
+        "itm_base", "itm_price", "itm_stock", "itm_category", "itm_review", 
+        "itm_qna", "itm_img", "itm_display", "itm_vendor", "itm_discount"
+      ]
+    },
+    {
+      "schema": "cust_db",
+      "method": "mydumper",
+      "tables": [
+        "cst_base", "cst_addr", "cst_term", "cst_black", "cst_counsel", 
+        "cst_memo", "cst_group", "cst_event", "cst_coupon", "cst_benefit"
+      ],
+      "threads": 2
+    }
+  ]
+}

@@ -1,0 +1,47 @@
+{
+  "db_type_pair": "tibero_to_mysql",
+  "source_tibero": {
+    "host": "10.10.4.10",
+    "port": 8629,
+    "sid": "tibero",
+    "user": "sys",
+    "pass": "tibero_src_pwd",
+    "nls_lang": "UTF8"
+  },
+  "target_mysql": {
+    "host": "10.10.1.20",
+    "port": 3306,
+    "user": "root",
+    "pass": "tgt_mysql_pass456@",
+    "charset": "utf8mb4"
+  },
+  "jobs": [
+    {
+      "source_schema": "MEMBER_DB",
+      "target_schema": "member_db",
+      "tables": [
+        "MBR_BASE", "MBR_DETAIL", "MBR_LOG_01", "MBR_LOG_02", "MBR_LOG_03", 
+        "MBR_AUTH", "MBR_SNS", "MBR_POINT", "MBR_GRADE", "MBR_DORMANT"
+      ],
+      "method": "tbexport_to_csv"
+    },
+    {
+      "source_schema": "ITEM_DB",
+      "target_schema": "item_db",
+      "tables": [
+        "ITM_BASE", "ITM_PRICE", "ITM_STOCK", "ITM_CATEGORY", "ITM_REVIEW", 
+        "ITM_QNA", "ITM_IMG", "ITM_DISPLAY", "ITM_VENDOR", "ITM_DISCOUNT"
+      ],
+      "method": "tbexport_to_csv"
+    },
+    {
+      "source_schema": "CUST_DB",
+      "target_schema": "cust_db",
+      "tables": [
+        "CST_BASE", "CST_ADDR", "CST_TERM", "CST_BLACK", "CST_COUNSEL", 
+        "CST_MEMO", "CST_GROUP", "CST_EVENT", "CST_COUPON", "CST_BENEFIT"
+      ],
+      "method": "tbexport_to_csv"
+    }
+  ]
+}

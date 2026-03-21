@@ -1,0 +1,46 @@
+{
+  "db_type": "postgresql",
+  "source": {
+    "host": "10.10.2.10",
+    "port": 5432,
+    "user": "postgres",
+    "pass": "src_pg_pass123!",
+    "database": "postgres"
+  },
+  "target": {
+    "host": "10.10.2.20",
+    "port": 5432,
+    "user": "postgres",
+    "pass": "tgt_pg_pass456@",
+    "database": "postgres"
+  },
+  "jobs": [
+    {
+      "schema": "member_db",
+      "method": "pg_dump",
+      "format": "custom",
+      "tables": [
+        "mbr_base", "mbr_detail", "mbr_log_01", "mbr_log_02", "mbr_log_03", 
+        "mbr_auth", "mbr_sns", "mbr_point", "mbr_grade", "mbr_dormant"
+      ]
+    },
+    {
+      "schema": "item_db",
+      "method": "pg_dump",
+      "format": "plain",
+      "tables": [
+        "itm_base", "itm_price", "itm_stock", "itm_category", "itm_review", 
+        "itm_qna", "itm_img", "itm_display", "itm_vendor", "itm_discount"
+      ]
+    },
+    {
+      "schema": "cust_db",
+      "method": "pg_dump",
+      "format": "custom",
+      "tables": [
+        "cst_base", "cst_addr", "cst_term", "cst_black", "cst_counsel", 
+        "cst_memo", "cst_group", "cst_event", "cst_coupon", "cst_benefit"
+      ]
+    }
+  ]
+}

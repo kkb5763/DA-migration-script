@@ -1,0 +1,45 @@
+{
+  "db_type": "mongodb",
+  "source": {
+    "host": "10.10.5.10",
+    "port": 27017,
+    "user": "mongo_admin",
+    "pass": "src_mongo_pwd",
+    "auth_db": "admin"
+  },
+  "target": {
+    "host": "10.10.5.20",
+    "port": 27017,
+    "user": "mongo_admin",
+    "pass": "tgt_mongo_pwd",
+    "auth_db": "admin"
+  },
+  "jobs": [
+    {
+      "database": "member_db",
+      "collections": [
+        "mbr_base", "mbr_detail", "mbr_log_01", "mbr_log_02", "mbr_log_03", 
+        "mbr_auth", "mbr_sns", "mbr_point", "mbr_grade", "mbr_dormant"
+      ],
+      "method": "mongodump",
+      "options": "--gzip --archive"
+    },
+    {
+      "database": "item_db",
+      "collections": [
+        "itm_base", "itm_price", "itm_stock", "itm_category", "itm_review", 
+        "itm_qna", "itm_img", "itm_display", "itm_vendor", "itm_discount"
+      ],
+      "method": "mongodump",
+      "options": "--gzip --numParallelCollections=4"
+    },
+    {
+      "database": "cust_db",
+      "collections": [
+        "cst_base", "cst_addr", "cst_term", "cst_black", "cst_counsel", 
+        "cst_memo", "cst_group", "cst_event", "cst_coupon", "cst_benefit"
+      ],
+      "method": "mongodump"
+    }
+  ]
+}
