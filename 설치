@@ -57,4 +57,33 @@ EOF
 sudo dnf install -y mongodb-database-tools
 
 
+DB 연결 체크 DAG (check_connections)#########################################################################################################
+
+`dags/check/` 아래의 스크립트들은 "DB 접속 후 간단 쿼리 실행"으로 연결 여부를 확인합니다.
+Airflow에서 `check_connections` DAG로 실행 가능합니다.
+
+필수 구성:
+
+1) MySQL: mysql client 설치 (SELECT 1 실행)
+ - sudo dnf install -y mysql-community-client
+
+2) PostgreSQL: psql 설치 (SELECT 1 실행)
+ - sudo dnf install -y postgresql15
+
+3) MongoDB: mongosh 또는 mongo 설치 (ping 실행)
+ - 권장: mongosh (MongoDB Shell)
+ - 또는: mongo (legacy shell) / 설치 환경에 따라 제공 여부가 다름
+
+4) Tibero: JDBC 드라이버 + Python 패키지
+ - Tibero JDBC JAR (예: `/data/airflow/lib/thr_jdbc.jar`)
+ - Python:
+   pip install jaydebeapi JPype1
+
+환경변수(선택, 코드 기본값 override 용):
+ - MySQL: MYSQL_SRC_HOST, MYSQL_SRC_PORT, MYSQL_SRC_USER, MYSQL_SRC_PASS / MYSQL_TGT_*
+ - PostgreSQL: PG_SRC_HOST, PG_SRC_PORT, PG_SRC_USER, PG_SRC_PASS, PG_SRC_DB / PG_TGT_*
+ - MongoDB: MONGO_SRC_HOST, MONGO_SRC_PORT, MONGO_SRC_USER, MONGO_SRC_PASS, MONGO_SRC_AUTH_DB / MONGO_TGT_*
+ - Tibero: TIBERO_HOST, TIBERO_PORT, TIBERO_SID, TIBERO_USER, TIBERO_PASS, TIBERO_JDBC_JAR, TIBERO_JDBC_DRIVER
+
+
 
