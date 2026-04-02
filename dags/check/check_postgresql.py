@@ -42,6 +42,7 @@ def run_select_1(ep: dict) -> str:
         ep["user"],
         "-d",
         ep["database"],
+        "--no-password",
         "-tA",
         "-c",
         "SELECT 1;",
@@ -49,16 +50,27 @@ def run_select_1(ep: dict) -> str:
 
     env = os.environ.copy()
     env["PGPASSWORD"] = ep["pass"]
+    env.setdefault("PGCONNECT_TIMEOUT", "10")
 
-    proc = subprocess.run(
-        cmd,
-        env=env,
-        check=False,
-        capture_output=True,
-        text=True,
-    )
+    try:
+        proc = subprocess.run(
+            cmd,
+            env=env,
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=15,
+        )
+    except FileNotFoundError as e:
+        raise RuntimeError("psql 실행 파일을 찾을 수 없습니다 (PATH 확인 필요)") from e
+    except subprocess.TimeoutExpired as e:
+        raise RuntimeError("psql 실행이 timeout 되었습니다 (네트워크/방화벽/host/port 확인)") from e
+
     if proc.returncode != 0:
-        raise RuntimeError((proc.stderr or proc.stdout or "").strip())
+        stderr = (proc.stderr or "").strip()
+        stdout = (proc.stdout or "").strip()
+        msg = stderr or stdout or f"psql exited with {proc.returncode}"
+        raise RuntimeError(msg)
 
     return (proc.stdout or "").strip()
 
@@ -68,10 +80,13 @@ def main() -> int:
     for ep in POSTGRES_ENDPOINTS:
         try:
             out = run_select_1(ep)
-            print(f"[OK]   PostgreSQL {ep['label']}: {ep['host']}:{ep['port']} -> {out}")
+            print(f"[OK]   PostgreSQL {ep['label']}: {ep['host']}:{ep['port']} -> {out}", flush=True)
         except Exception as e:
             failed = True
-            print(f"[FAIL] PostgreSQL {ep['label']}: {ep['host']}:{ep['port']} ({type(e).__name__}: {e})")
+            print(
+                f"[FAIL] PostgreSQL {ep['label']}: {ep['host']}:{ep['port']} ({type(e).__name__}: {e})",
+                flush=True,
+            )
 
     return 1 if failed else 0
 

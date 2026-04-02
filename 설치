@@ -78,6 +78,10 @@ Airflow에서 `check_connections` DAG로 실행 가능합니다.
  - Tibero JDBC JAR (예: `/data/airflow/lib/thr_jdbc.jar`)
  - Python:
    pip install jaydebeapi JPype1
+ - Java (JVM 필요 / libjvm 로딩):
+   sudo dnf install -y java-11-openjdk-headless
+   # 필요 시 JAVA_HOME 설정 (airflow 실행 유저 기준)
+   export JAVA_HOME=/usr/lib/jvm/jre-11
 
 환경변수(선택, 코드 기본값 override 용):
  - MySQL: MYSQL_SRC_HOST, MYSQL_SRC_PORT, MYSQL_SRC_USER, MYSQL_SRC_PASS / MYSQL_TGT_*
